@@ -214,17 +214,60 @@ const Confirmation = styled(motion.div)`
   }
 `;
 
+const Select = styled.select`
+  padding: ${({ theme }) => theme.spacing.md};
+  border: 2px solid ${({ theme }) => theme.colors.secondary};
+  border-radius: 5px;
+  font-family: ${({ theme }) => theme.fonts.tertiary};
+  font-size: 1rem;
+  transition: ${({ theme }) => theme.animations.transition};
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 2px rgba(11, 75, 60, 0.1);
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: ${({ theme }) => theme.spacing.sm};
+    font-size: 0.9rem;
+  }
+`;
+
 const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const [contactMethod, setContactMethod] = useState('whatsapp');
+  const { register, handleSubmit, formState: { errors }, watch } = useForm();
 
   const handleFormSubmit = async (data) => {
     try {
-      await onSubmit(data);
+      let contactInfo = data.contactInfo;
+      if (contactMethod === 'whatsapp') {
+        contactInfo = `52${data.contactInfo}`; // Agregamos el prefijo "52"
+      }
+
+      const formattedData = {
+        fullName: data.fullName,
+        contactMethod: contactMethod,
+        contactInfo: contactInfo,
+        guests: parseInt(data.guests, 10)
+      };
+      await onSubmit(formattedData);
       setIsSubmitted(true);
     } catch (error) {
       console.error('Error submitting RSVP:', error);
     }
+  };
+
+  const validateEmail = (value) => {
+    const validDomains = ['gmail.com', 'outlook.com', 'hotmail.com'];
+    const emailRegex = new RegExp(`^[a-zA-Z0-9._-]+@(${validDomains.join('|')})$`);
+    return emailRegex.test(value) || 'Ingresa un correo válido de Gmail, Outlook o Hotmail';
+  };
+
+  const validateWhatsApp = (value) => {
+    const whatsAppRegex = /^[0-9]{10}$/;
+    return whatsAppRegex.test(value) || 'Ingresa un número de WhatsApp válido de 10 dígitos';
   };
 
   return (
@@ -251,7 +294,7 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                   <FormGroup>
                     <Label>Nombre Completo</Label>
                     <Input
-                      {...register('fullName', { required: 'Porfavor ingresa tu nombre' })}
+                      {...register('fullName', { required: 'Por favor ingresa tu nombre' })}
                       placeholder="Tu nombre completo"
                     />
                     {errors.fullName && (
@@ -260,22 +303,40 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                   </FormGroup>
 
                   <FormGroup>
-                    <Label>WhatsApp ó Correo</Label>
-                    <Input
-                      {...register('contact', { required: 'Porfavor ingresa tu número de WhatsApp o un Correo' })}
-                      placeholder="tu@email.com o tu número de WhatsApp"
-                    />
-                    {errors.contact && (
-                      <ErrorMessage>{errors.contact.message}</ErrorMessage>
-                    )}
+                    <Label>Método de contacto</Label>
+                    <Select
+                      value={contactMethod}
+                      onChange={(e) => setContactMethod(e.target.value)}
+                    >
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="email">Email</option>
+                    </Select>
                   </FormGroup>
 
                   <FormGroup>
-                    <Label>Numero de asistentes</Label>
+                    <Label>{contactMethod === 'email' ? 'Correo electrónico' : 'Número de WhatsApp'}</Label>
+                    <Input
+                      {...register('contactInfo', {
+                        required: `Por favor ingresa tu ${contactMethod === 'email' ? 'correo electrónico' : 'número de WhatsApp'}`,
+                        validate: contactMethod === 'email' ? validateEmail : validateWhatsApp
+                      })}
+                      placeholder={contactMethod === 'email' ? 'tu@gmail.com' : '5520321243'}
+                    />
+                    {errors.contactInfo && (
+                      <ErrorMessage>{errors.contactInfo.message}</ErrorMessage>
+                    )}
+                  </FormGroup>
+
+                  {contactMethod === 'whatsapp' && (
+                    <small>(Ingresa solo los 10 dígitos de tu número, sin el prefijo 52.)</small>
+                  )}
+
+                  <FormGroup>
+                    <Label>Número de asistentes</Label>
                     <Input
                       type="number"
                       {...register('guests', {
-                        required: 'Porfavor ingresa el número de personas contandote a ti',
+                        required: 'Por favor ingresa el número de personas contándote a ti',
                         min: { value: 1, message: 'Mínimo 1 persona' },
                         max: { value: 10, message: 'Máximo 10 acompañantes' }
                       })}
