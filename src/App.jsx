@@ -48,7 +48,7 @@ const RSVPButton = styled.button`
 
 // Configuración de Axios para el backend
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+  baseURL: process.env.REACT_APP_API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
