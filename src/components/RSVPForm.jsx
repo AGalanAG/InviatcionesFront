@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 
+
 const Modal = styled(motion.div)`
   position: fixed;
   top: 0;
@@ -234,26 +235,69 @@ const Select = styled.select`
   }
 `;
 
-const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
+// Agregar estos componentes styled
+const ErrorBanner = styled.div`
+  background-color: ${({ theme }) => theme.colors.error};
+  color: white;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+`;
+
+const NoteText = styled.small`
+  display: block;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 0.8rem;
+`;
+
+const LoadingSpinner = styled.div`
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin: 0 auto;
+`;
+
+const RSVPForm = ({ isOpen, onClose, onSubmit, loading, error }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [contactMethod, setContactMethod] = useState('whatsapp');
-  const { register, handleSubmit, formState: { errors }, watch } = useForm();
+  const { register, handleSubmit, formState: { errors }, reset } = useForm();
 
   const handleFormSubmit = async (data) => {
     try {
       let contactInfo = data.contactInfo;
+      
+      // Validación mejorada del número WhatsApp
       if (contactMethod === 'whatsapp') {
-        contactInfo = `52${data.contactInfo}`; // Agregamos el prefijo "52"
+        const cleanedNumber = contactInfo.replace(/[^\d]/g, '');
+        contactInfo = `52${cleanedNumber}`;
       }
 
       const formattedData = {
-        fullName: data.fullName,
+        fullName: data.fullName.trim(),
         contactMethod: contactMethod,
         contactInfo: contactInfo,
         guests: parseInt(data.guests, 10)
       };
+      
       await onSubmit(formattedData);
       setIsSubmitted(true);
+      
+      // Cierre automático después de 3 segundos
+      setTimeout(() => {
+        onClose();
+        reset();
+        setIsSubmitted(false);
+      }, 3000);
+
     } catch (error) {
       console.error('Error submitting RSVP:', error);
     }
@@ -261,13 +305,14 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
 
   const validateEmail = (value) => {
     const validDomains = ['gmail.com', 'outlook.com', 'hotmail.com'];
-    const emailRegex = new RegExp(`^[a-zA-Z0-9._-]+@(${validDomains.join('|')})$`);
-    return emailRegex.test(value) || 'Ingresa un correo válido de Gmail, Outlook o Hotmail';
+    const emailRegex = new RegExp(`^[a-zA-Z0-9._%+-]+@(${validDomains.join('|')})$`, 'i');
+    return emailRegex.test(value) || 'Dominio no válido (aceptamos Gmail, Outlook o Hotmail)';
   };
 
   const validateWhatsApp = (value) => {
-    const whatsAppRegex = /^[0-9]{10}$/;
-    return whatsAppRegex.test(value) || 'Ingresa un número de WhatsApp válido de 10 dígitos';
+    const cleanedValue = value.replace(/[^\d]/g, '');
+    return (cleanedValue.length === 10 && /^\d+$/.test(cleanedValue)) || 
+           'Ingresa 10 dígitos sin espacios ni caracteres especiales';
   };
 
   return (
@@ -290,12 +335,25 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
             {!isSubmitted ? (
               <>
                 <Title>Confirma tu Asistencia</Title>
+                {error && (
+                  <ErrorBanner>
+                    {error.includes('registrado') 
+                      ? 'Ya tienes una confirmación registrada' 
+                      : 'Error al procesar tu solicitud'}
+                  </ErrorBanner>
+                )}
                 <Form onSubmit={handleSubmit(handleFormSubmit)}>
                   <FormGroup>
                     <Label>Nombre Completo</Label>
                     <Input
-                      {...register('fullName', { required: 'Por favor ingresa tu nombre' })}
-                      placeholder="Tu nombre completo"
+                      {...register('fullName', { 
+                        required: 'Campo obligatorio',
+                        maxLength: {
+                          value: 100,
+                          message: 'Máximo 100 caracteres'
+                        }
+                      })}
+                      placeholder="Ej. María Guadalupe Pérez García"
                     />
                     {errors.fullName && (
                       <ErrorMessage>{errors.fullName.message}</ErrorMessage>
@@ -306,7 +364,10 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                     <Label>Método de contacto</Label>
                     <Select
                       value={contactMethod}
-                      onChange={(e) => setContactMethod(e.target.value)}
+                      onChange={(e) => {
+                        setContactMethod(e.target.value);
+                        reset({ contactInfo: '' });
+                      }}
                     >
                       <option value="whatsapp">WhatsApp</option>
                       <option value="email">Email</option>
@@ -317,10 +378,13 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                     <Label>{contactMethod === 'email' ? 'Correo electrónico' : 'Número de WhatsApp'}</Label>
                     <Input
                       {...register('contactInfo', {
-                        required: `Por favor ingresa tu ${contactMethod === 'email' ? 'correo electrónico' : 'número de WhatsApp'}`,
+                        required: 'Campo obligatorio',
                         validate: contactMethod === 'email' ? validateEmail : validateWhatsApp
                       })}
-                      placeholder={contactMethod === 'email' ? 'tu@gmail.com' : '5520321243'}
+                      type={contactMethod === 'email' ? 'email' : 'tel'}
+                      placeholder={contactMethod === 'email' 
+                        ? 'ejemplo@gmail.com' 
+                        : '55 1234 5678'}
                     />
                     {errors.contactInfo && (
                       <ErrorMessage>{errors.contactInfo.message}</ErrorMessage>
@@ -328,7 +392,9 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                   </FormGroup>
 
                   {contactMethod === 'whatsapp' && (
-                    <small>(Ingresa solo los 10 dígitos de tu número, sin el prefijo 52.)</small>
+                    <NoteText>
+                      * Ingresa tu número de 10 dígitos sin espacios ni código de país
+                    </NoteText>
                   )}
 
                   <FormGroup>
@@ -336,18 +402,33 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                     <Input
                       type="number"
                       {...register('guests', {
-                        required: 'Por favor ingresa el número de personas contándote a ti',
-                        min: { value: 1, message: 'Mínimo 1 persona' },
-                        max: { value: 10, message: 'Máximo 10 acompañantes' }
+                        required: 'Campo obligatorio',
+                        min: { 
+                          value: 1, 
+                          message: 'Mínimo 1 persona (incluyéndote)' 
+                        },
+                        max: { 
+                          value: 10, 
+                          message: 'Máximo 10 acompañantes' 
+                        }
                       })}
-                      placeholder="Número de personas"
+                      placeholder="Ej. 3"
                     />
                     {errors.guests && (
                       <ErrorMessage>{errors.guests.message}</ErrorMessage>
                     )}
                   </FormGroup>
 
-                  <SubmitButton type="submit">Confirmar Asistencia</SubmitButton>
+                  <SubmitButton 
+                    type="submit" 
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <LoadingSpinner />
+                    ) : (
+                      'Confirmar Asistencia'
+                    )}
+                  </SubmitButton>
                 </Form>
               </>
             ) : (
@@ -355,8 +436,8 @@ const RSVPForm = ({ isOpen, onClose, onSubmit }) => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
-                <h3>¡Gracias por confirmar!</h3>
-                <p>Nos vemos en la celebración.</p>
+                <h3>¡Confirmación Exitosa! 🎉</h3>
+                <p>Recibirás la confirmación en tu {contactMethod === 'email' ? 'correo' : 'WhatsApp'}</p>
               </Confirmation>
             )}
           </FormContainer>

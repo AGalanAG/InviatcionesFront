@@ -6,9 +6,10 @@ import FamilySection from './components/FamilySection';
 import EventDetails from './components/EventDetails';
 import RSVPForm from './components/RSVPForm';
 import styled, { createGlobalStyle } from 'styled-components';
+import axios from 'axios';
+
 
 const GlobalStyle = createGlobalStyle`
-  
   * {
     margin: 0;
     padding: 0;
@@ -45,8 +46,19 @@ const RSVPButton = styled.button`
   }
 `;
 
+// Configuración de Axios para el backend
+const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
 const App = () => {
   const [isRSVPOpen, setIsRSVPOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const eventData = {
     quinceañera: {
@@ -84,8 +96,25 @@ const App = () => {
   };
 
   const handleRSVPSubmit = async (formData) => {
-    console.log('Confirma tu asistencia:', formData);
-    // Add your submission logic here
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.post('/api/attendance', formData);
+      
+      if (response.status === 201) {
+        alert('¡Registro exitoso!');
+        setIsRSVPOpen(false);
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Error al procesar tu registro';
+      setError(errorMessage);
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -97,7 +126,10 @@ const App = () => {
         date={eventData.event.date}
         image={eventData.quinceañera.image}
       />
-      <FamilySection parents={eventData.family.parents} godparents={eventData.family.godparents} />
+      <FamilySection 
+        parents={eventData.family.parents} 
+        godparents={eventData.family.godparents} 
+      />
       <EventDetails
         mass={eventData.event.mass}
         reception={eventData.event.reception}
@@ -109,10 +141,13 @@ const App = () => {
       <RSVPButton onClick={() => setIsRSVPOpen(true)}>
         Confirmar asistencia
       </RSVPButton>
+      
       <RSVPForm
         isOpen={isRSVPOpen}
         onClose={() => setIsRSVPOpen(false)}
         onSubmit={handleRSVPSubmit}
+        loading={loading}
+        error={error}
       />
     </ThemeProvider>
   );
