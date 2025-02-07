@@ -67,7 +67,7 @@ const App = () => {
     },
     family: {
       parents:{
-        father: "Sr. Alberto González García",
+        father: "Sr. Alberto González Beltran",
         mother: "Sra. Elizabeth Esperanza García Maya"
       },
       godparents: {
